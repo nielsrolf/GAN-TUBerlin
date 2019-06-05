@@ -210,8 +210,8 @@ class GradientInverser():
         self.iterate = K.function([g.inputs[0], reals], [loss, gradient])
 
     def invert(self, x):
-        z = gan.prior(1000)
-        fakes = gan.generator.predict(z).reshape([1000, -1])
+        z = self.gan.prior(1000)
+        fakes = self.gan.generator.predict(z).reshape([1000, -1])
         x_ = x.reshape([-1, fakes.shape[1]])
         z=z[cdist(fakes, x.reshape([-1, fakes.shape[1]])).argmin(0)]
         lr = z*0+0.1
