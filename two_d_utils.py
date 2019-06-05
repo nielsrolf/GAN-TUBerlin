@@ -6,7 +6,7 @@ from gan import *
 # Data generation
 na = None
 
-def show_2D(x_real, x_fake=None, title=None, space='x'):
+def show_2d(x_real, x_fake=None, title=None, space='x'):
     plt.plot(x_real[:, 0], x_real[:, 1], '.', label='Real')
     if x_fake is not None:
         plt.plot(x_fake[:, 0], x_fake[:, 1], '.', label='Fake')
@@ -23,7 +23,7 @@ def get_mode(center, n_per_mode, r):
     dist = np.linalg.norm(samples-center[na,...], axis=1)
     return samples[dist<r][:n_per_mode]
 
-def generate_2D(n_per_mode, radius=0.2):
+def generate_2d(n_per_mode, radius=0.2):
     centers = [
         np.array([-1, -1]),
         np.array([-1, 1]),
@@ -40,8 +40,8 @@ uniform = Uniform()
 
 def show_learned_distribution(prior, G):
     z = prior(500)
-    show_2D(z, title='Prior', space='z')
-    show_2D(G.predict(z), title='G(z)')
+    show_2d(z, title='Prior', space='z')
+    show_2d(G.predict(z), title='G(z)')
     
 
 def make_grid():
