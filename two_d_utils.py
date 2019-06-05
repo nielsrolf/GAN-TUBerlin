@@ -42,47 +42,7 @@ def show_learned_distribution(prior, G):
     z = prior(500)
     show_2d(z, title='Prior', space='z')
     show_2d(G(z), title='G(z)')
-
-
-mini_arch = lambda: [
-    layers.Dense(4, use_bias=False, input_shape=(2,)),
-    layers.BatchNormalization(),
-    layers.LeakyReLU(),
-    layers.Dense(4, use_bias=False),
-    layers.BatchNormalization(),
-    layers.LeakyReLU()
-]
-
-big_arch = lambda: [
-    layers.Dense(100, use_bias=False, input_shape=(2,)),
-    layers.BatchNormalization(),
-    layers.LeakyReLU(),
-    layers.Dense(100, use_bias=False),
-    layers.BatchNormalization(),
-    layers.LeakyReLU()
-]
-
-def flexibel_arch(neurons):
-    return lambda: [
-        layers.Dense(neurons, use_bias=False, input_shape=(2,)),
-        layers.BatchNormalization(),
-        layers.LeakyReLU(),
-        layers.Dense(neurons, use_bias=False),
-        layers.BatchNormalization(),
-        layers.LeakyReLU()
-    ]
     
-    
-
-# ## Training Analysis and Callbacks
-# 
-# Now let's train a GAN to sample from this distribution. We can analyze the training by repeatedly checking the following questions:
-# 1. how does the learned distribution change over time?
-# 2. what is $ D(G(z)) $ for a grid of $z$s?
-# 3. what is the mapping $G$? We can associate each point $z$ with a color $C(G(z))$, where the color mapping $C$ is e.g. an rgb color: $(x_1, x_2) -> rgb(n(x_1), n(x_2), 0) $ where $n$ is an affine function.
-# 
-# Let's create the plot functions we can use to analyze our GAN one by one. During training, we can pass it as callbacks that are executed after each epoch, to see how training evolves.
-# 
 
 def make_grid():
     ticks = np.arange(-1.5, 1.5, 0.05)
@@ -144,32 +104,6 @@ def score_over_z(G, D, title=None):
     plt.show()
     
 
-# ### More callbacks
-# 
-# We will define a few more callbacks that track and plot loss or accuracy, and one that shows how the projection of a batch of fixed $z$s evolves during training
-
-class EvolvingCallback():
-    def __init__(self, gan, x):
-        self.gan = gan
-        self.z = gan.prior(100) # for plotting how the projection evolves
-        self.z_at_epoch = [gan.G(self.z)]
-        self.x = x
-    
-    def track(self):
-        self.z_at_epoch += [self.gan.G(self.z)]
-        
-    def plot(self):
-        t = np.stack(self.z_at_epoch, axis=0)
-        epochs = len(self.z_at_epoch)
-        plt.clf()
-        plt.plot(self.x[:,0], self.x[:,1], 'o')
-        for p in range(t.shape[1]):
-            plt.plot(t[:,p,0], t[:,p,1], alpha=0.5, color='orange')
-        plt.plot(t[-1,:,0], t[-1,:,1], 'o', color='red')
-        plt.title(f"Epoch {epochs}")
-        plt.show()
-
-
 
 def d_landscape(d, x, title=None):
     # make grid
@@ -216,118 +150,5 @@ class DLandscapeCallback():
         d_landscape(self.gan.D, np.concatenate([self.data,self.gan.G(self.gan.prior(400))], axis=0))
  
 
-
-# ## Experiments
-# Now we can do experiments.
-# 
-# 
-
-# ### Initial Experiments: can G fit a fixed D, vice verca and can both fit our toy data
-# Let's start with the following three:
-# - train only G and see that it gets better at fooling D
-# - train only D and see that it gets better at recognizing fakes and trues
-# - train G and D and see if it learns our real distribution
-
-def d_g_ratio_experiment(g_steps, d_steps, experiment_title, arch=flexibel_arch(512)):
-    print("================================================")
-    print(experiment_title)
-    print("================================================")
-    gan = GAN(uniform, Generator(arch), Discriminator(arch))
-    d_landscape(gan.D, x, title=experiment_title+" D landscape before training")
-    
-    e = EvolvingCallback(gan, x)
-    m = LossMetrics(gan, x)
-    p = PMetrics(gan, x)
-    
-    callbacks = [
-        (e.track, 1),
-        (e.plot, 10),
-        (DLandscapeCallback(gan).plot, 10),
-        (p.track, 1),
-        (p.plot, 10)
-    ]
-    gan.fit(x,
-        epochs=100,
-        file_prefix='models/2d_uniform',
-        callbacks=callbacks,
-        d_updates=d_steps,
-        g_updates=g_steps
-    )
-    d_landscape(gan.D, x, title=experiment_title+" D landscape after training")
-
-
-# This doesn't look good at all. We note a few things:
-# - G is not able to fit D very well if we train only D
-# - D is not able to fit a randomly initialized fix G and our distribution very well, if we train only D
-# - If we train both together.
-# 
-# It seems that our mini architecture is not complex enough, but let's also see if D can fit our distribution if we use a generator that just maps the identity.
-# 
-
-# ### Train D with identity G
-
-
-class IdentityG(Generator):
-    def __init__(self, scale=1.5):
-        inputs=keras.Input(shape=[2])
-        self.scale=scale
-        self.model = Model(inputs=inputs, outputs=self.forward(inputs))
-        self.optimizer = keras.optimizers.Adam(0.0002, 0.5)
-    
-    def forward(self, z):
-        return layers.Lambda(lambda x: x *self.scale)(z)
-    
-    
-def train_d_against_identity_g(): 
-    gan = GAN(uniform, IdentityG(), Discriminator(flexibel_arch(512)))
-    
-    d_landscape(gan.D, x, title="Big D landscape before training")
-
-    callbacks = [
-        (DLandscapeCallback(gan).plot, 10)
-    ]
-    gan.fit(x,
-        epochs=100,
-        file_prefix='models/2d_uniform',
-        callbacks=callbacks,
-        d_updates=1,
-        g_updates=0
-    )
-
-
-# ### Compare to optimal D
-# 
-# We also know the optimal classifier and compare against it:
-
-
-def optimal_d_for_uniform_fakes(x):
-    y = np.zeros(len(x))
-    for c in [[-1, -1], [-1, 1], [1, -1], [1, 1]]:
-        y[np.linalg.norm(x-np.array([c]), axis=1)<0.2] = 1
-    y *= 0.9208103130755064 # because there are some fakes in the true blops as well, we need to scale down
-    return y
-
-#d_landscape(optimal_d_for_uniform_fakes, x)
-
-def evaluate_d_on_uniform(d, real):
-    fake = np.random.uniform(low=real.min(), high=real.max(), size=real.shape)
-    x = np.concatenate([real, fake], axis=0)
-    y_pred = d(x)
-    y_opti = optimal_d_for_uniform_fakes(x)
-    print(f"D: avg real={y_pred[:len(fake)].mean():.2f}\n       fake=={y_pred[len(fake):].mean():.2f}")
-    print(f"Opti   real={y_opti[:len(fake)].mean():.2f}\n       fake=={y_opti[len(fake):].mean():.2f}")
-
-
-# D is not optimal but it can fit the problem reasonably. Maybe the result gets better when we pretrain D.
-
-# ### Initial experiments with pretrained D
-# 
-# This still doesn't look like the true distribution, but it's much closer. So let's repeat the first experiment and pretrain D against a uniform distribution.
-
-
-def pretrain_d(D, x):
-    pretrain_gan = GAN(uniform, IdentityG(scale=3), D)
-    pretrain_gan.fit(x,epochs=5,file_prefix='models/2d_uniform', g_updates=0, d_updates=1)
-    
 
 
