@@ -1,6 +1,9 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from gan import GradientInverser
+from tensorflow.keras.models import Sequential, load_model
+from tensorflow.keras.layers import Dense, Flatten, Dropout, Conv2D, MaxPooling2D
+from tensorflow import keras
 
 
 class PMetrics():
@@ -77,7 +80,7 @@ class InterpolationCallback(EvolvingImageCallback):
 
 class InterpolationCallback2D(InterpolationCallback):
     def show(self, x):
-        plt.plot(x[:,0], x[:,1], 'o')
+        plt.plot(x[:,0], x[:,1])
         plt.title("Projection of interpolation between two points")
         plt.show()
 
@@ -122,3 +125,45 @@ class InverseDistributionCallback():
         show(self.gan.G.predict(x_inv[:10]))
         print('Original', self.title)
         show(self.x[:10])
+
+
+class ModeCollapseObserver():
+    def __init__(self, gan, mode_predictor):
+        self.gan = gan
+        self.mode_predictor = mode_predictor
+      
+    def __call__(self):
+        z = self.gan.prior(1000)
+        img = self.gan.generator.predict(z)
+        modes = self.mode_predictor.predict(img).argmax(1)
+        plt.hist(modes)
+        plt.show()
+        
+        
+def train_mnist_predictor():
+    model = Sequential()
+    model.add(Conv2D(32, kernel_size=(3, 3),
+                     activation='relu',
+                     input_shape=(28, 28, 1)))
+    model.add(Conv2D(64, (3, 3), activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Dropout(0.25))
+    model.add(Flatten())
+    model.add(Dense(128, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(10, activation='softmax'))
+
+    model.compile(loss=keras.losses.categorical_crossentropy,
+                  optimizer=keras.optimizers.Adadelta(),
+                  metrics=['accuracy'])
+
+    model.fit(X_train, Y_train,
+              batch_size=128,
+              epochs=12,
+              verbose=1,
+              validation_data=(X_test, Y_test))
+    model.save(f"{PROJECT_PATH}/mnist_predictor.h5")
+
+    
+def get_mnist_predictor():
+    return load_model(f"{PROJECT_PATH}/mnist_predictor.h5")
