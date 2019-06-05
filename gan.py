@@ -125,7 +125,7 @@ class DCGAN():
 
         return Model(img, validity)
 
-    def train(self, X_train, epochs, batch_size=128, callbacks=[]):
+    def train(self, X_train, epochs, batch_size=128, callbacks=[], d_steps=1, g_steps=1):
 
         X_train = np.reshape(X_train, [-1]+list(self.img_shape))
 
@@ -144,32 +144,33 @@ class DCGAN():
             imgs = X_train[idx]
             for batch_id, imgs in enumerate(batches(X_train, batch_size)):
 
-              # Sample noise and generate a batch of new images
-              noise = self.prior(batch_size)
-              gen_imgs = self.generator.predict(noise)
-              fakes_val = gen_imgs[:10]
+                # Sample noise and generate a batch of new images
+                for _ in range(d_steps):
+                    noise = self.prior(batch_size)
+                    gen_imgs = self.generator.predict(noise)
+                    fakes_val = gen_imgs[:10]
 
-              # Train the discriminator (real classified as ones and generated as zeros)
-              d_loss_real = self.discriminator.train_on_batch(imgs, valid)
-              d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
-              d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
+                    # Train the discriminator (real classified as ones and generated as zeros)
+                    d_loss_real = self.discriminator.train_on_batch(imgs, valid)
+                    d_loss_fake = self.discriminator.train_on_batch(gen_imgs, fake)
+                    d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
-              #assert np.allclose(self.generator.predict(noise)[:10], fakes_val), "D update effects G"
+                #assert np.allclose(self.generator.predict(noise)[:10], fakes_val), "D update effects G"
 
-              # ---------------------
-              #  Train Generator
-              # ---------------------
+                # ---------------------
+                #  Train Generator
+                # ---------------------
+                for _ in range(g_steps):
+                    # Train the generator (wants discriminator to mistake images as real)
+                    y_val = self.discriminator.predict(imgs[:10])
+                    g_loss = self.combined.train_on_batch(noise, valid)
+                    #assert np.allclose(y_val, self.discriminator.predict(imgs[:10])), "G update effects D"
 
-              # Train the generator (wants discriminator to mistake images as real)
-              y_val = self.discriminator.predict(imgs[:10])
-              g_loss = self.combined.train_on_batch(noise, valid)
-              #assert np.allclose(y_val, self.discriminator.predict(imgs[:10])), "G update effects D"
-
-            # Plot the progress
-            print ("\n%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
-            for callback, period in callbacks:
-              if (epoch+1) % period == 0:
-                callback()
+                # Plot the progress
+                print ("\n%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
+                for callback, period in callbacks:
+                    if (epoch+1) % period == 0:
+                        callback()
     
     def save(self, file_prefix='dcgan'):
         self.generator.save_weights(f"{file_prefix}_g.h5")
@@ -218,13 +219,13 @@ class GradientInverser():
         momentum = 0.5
         old_gradient = 0
         for i in range(40):
-            loss, gradient = iterate([z, x])
+            loss, gradient = self.iterate([z, x])
             gradient = (1-momentum)*gradient + momentum*old_gradient
             old_gradient = gradient
             loss = np.sum(loss, axis=(1, 2, 3))[...,None]
             new_z = z - lr*gradient
             new_z = np.clip(new_z, -1, 1)
-            new_loss, _ = iterate([new_z, x])
+            new_loss, _ = self.iterate([new_z, x])
             new_loss = np.sum(new_loss, axis=(1, 2, 3))[...,None]
             z = np.where(new_loss<loss, new_z, z+np.random.normal(0, 0.01, z.shape))
             lr = np.where(new_loss>loss, lr/2, lr*1.1)*0.9
