@@ -35,7 +35,7 @@ class DCGAN():
     def __init__(self, prior, img_shape=(28, 28, 1), load_from=None):
         self.img_shape = img_shape
         self.channels = img_shape[-1]
-        self.latent_dim = 100
+        self.latent_dim = prior.d
         self.prior = prior
         
           
@@ -229,3 +229,6 @@ class GradientInverser():
             z = np.where(new_loss<loss, new_z, z+np.random.normal(0, 0.01, z.shape))
             lr = np.where(new_loss>loss, lr/2, lr*1.1)*0.9
         return z
+    
+    def __call__(self, x):
+        return self.invert(x)

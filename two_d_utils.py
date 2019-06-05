@@ -6,7 +6,7 @@ from gan import *
 # Data generation
 na = None
 
-def show_2d(x_real, x_fake=None, title=None, space='x'):
+def show_2D(x_real, x_fake=None, title=None, space='x'):
     plt.plot(x_real[:, 0], x_real[:, 1], '.', label='Real')
     if x_fake is not None:
         plt.plot(x_fake[:, 0], x_fake[:, 1], '.', label='Fake')
@@ -23,7 +23,7 @@ def get_mode(center, n_per_mode, r):
     dist = np.linalg.norm(samples-center[na,...], axis=1)
     return samples[dist<r][:n_per_mode]
 
-def generate_2d(n_per_mode, radius=0.2):
+def generate_2D(n_per_mode, radius=0.2):
     centers = [
         np.array([-1, -1]),
         np.array([-1, 1]),
@@ -40,8 +40,8 @@ uniform = Uniform()
 
 def show_learned_distribution(prior, G):
     z = prior(500)
-    show_2d(z, title='Prior', space='z')
-    show_2d(G(z), title='G(z)')
+    show_2D(z, title='Prior', space='z')
+    show_2D(G.predict(z), title='G(z)')
     
 
 def make_grid():
@@ -91,7 +91,7 @@ def color_plot(mapping, title=None):
 
 def score_over_z(G, D, title=None):
     z = make_grid()
-    dgz = D(G(z))
+    dgz = D.predict(G.predict(z))
     plt.imshow(dgz.reshape(60, 60))
     ticks, labels = grid_labels()
     plt.xticks(ticks, labels)
@@ -105,7 +105,7 @@ def score_over_z(G, D, title=None):
     
 
 
-def d_landscape(d, x, title=None):
+def d_landscape(D, x, title=None):
     # make grid
     x0_min = x[:,0].min() - 0.1
     x0_max = x[:,0].max() + 0.1
@@ -119,7 +119,7 @@ def d_landscape(d, x, title=None):
     grid = np.dstack(np.meshgrid(x0_ticks, x1_ticks))
 
     # plot the landscape
-    plt.imshow(d(grid.reshape(-1, 2)).reshape(grid.shape[:-1]))
+    plt.imshow(D.predict(grid.reshape(-1, 2)).reshape(grid.shape[:-1]))
 
     # axis annotation
     xticks = [0, int(len(x0_ticks)/2), len(x0_ticks)-1]
@@ -147,7 +147,7 @@ class DLandscapeCallback():
         self.data = x
     
     def plot(self, *args, **kwargs):
-        d_landscape(self.gan.D, np.concatenate([self.data,self.gan.G(self.gan.prior(400))], axis=0))
+        d_landscape(self.gan.D, np.concatenate([self.data,self.gan.G.predict(self.gan.prior(400))], axis=0))
  
 
 

@@ -52,28 +52,19 @@ class EvolvingImageCallback():
         
     def plot(self):
         fakes = self.gan.G.predict(self.z)
-        show(fakes)
+        self.show(fakes)
 
-
-class Evolving2DCallback():
-    def __init__(self, gan):
-        self.gan = gan
-        self.z = gan.prior(100) # for plotting how the projection evolves
-        self.z_at_epoch = [gan.G.predict(self.z)]
-    
-    def track(self):
-        self.z_at_epoch += [self.gan.G.predict(self.z)]
-        
-    def plot(self):
-        t = np.stack(self.z_at_epoch, axis=0)
-        epochs = len(self.z_at_epoch)
-        plt.clf()
-        plt.plot(x[:,0], x[:,1], 'o')
-        for p in range(t.shape[1]):
-            plt.plot(t[:,p,0], t[:,p,1], alpha=0.5, color='orange')
-        plt.plot(t[-1,:,0], t[-1,:,1], 'o', color='red')
-        plt.title(f"Epoch {epochs}")
+    def show(self, images):
+        images = np.reshape(images, [-1, 28, 28])
+        n = images.shape[0]
+        fig, axes = plt.subplots(nrows=1, ncols=n, figsize=(n, 2),
+                                        sharex=True, sharey=True)
+        for i, img, ax in zip(range(n), images, axes):
+            ax.imshow((img+1)/2, cmap='Greys')
+            ax.axis('off')
         plt.show()
+
+
 class InterpolationCallback(EvolvingImageCallback):
     def __init__(self, gan):
         self.gan = gan
@@ -84,11 +75,18 @@ class InterpolationCallback(EvolvingImageCallback):
         self.z = a*x + b
 
 
-class Evolving2DCallback():
-    def __init__(self, gan):
+class InterpolationCallback2D(InterpolationCallback):
+    def show(self, x):
+        plt.plot(x[:,0], x[:,1], 'o')
+        plt.title("Projection of interpolation between two points")
+        plt.show()
+
+class EvolvingCallback2D():
+    def __init__(self, gan, x):
         self.gan = gan
         self.z = gan.prior(100) # for plotting how the projection evolves
         self.z_at_epoch = [gan.G.predict(self.z)]
+        self.x = x
     
     def track(self):
         self.z_at_epoch += [self.gan.G.predict(self.z)]
@@ -97,7 +95,7 @@ class Evolving2DCallback():
         t = np.stack(self.z_at_epoch, axis=0)
         epochs = len(self.z_at_epoch)
         plt.clf()
-        plt.plot(x[:,0], x[:,1], 'o')
+        plt.plot(self.x[:,0], self.x[:,1], 'o')
         for p in range(t.shape[1]):
             plt.plot(t[:,p,0], t[:,p,1], alpha=0.5, color='orange')
         plt.plot(t[-1,:,0], t[-1,:,1], 'o', color='red')
