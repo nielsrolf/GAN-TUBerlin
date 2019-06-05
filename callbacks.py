@@ -4,10 +4,10 @@ from gan import GradientInverser
 
 
 class PMetrics():
-    def __init__(self, gan, x_test):
-        self.gan = gan
+    def __init__(self, gan_, x_test):
+        self.gan = gan_
         self.x_test = x_test
-        self.z_test = gan.prior(len(x_test))
+        self.z_test = self.gan.prior(len(x_test))
         self.p_fake, self.fake_std = [], []
         self.p_real, self.real_std = [], []
         

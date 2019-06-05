@@ -166,11 +166,11 @@ class DCGAN():
                     g_loss = self.combined.train_on_batch(noise, valid)
                     #assert np.allclose(y_val, self.discriminator.predict(imgs[:10])), "G update effects D"
 
-                # Plot the progress
-                print ("\n%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
-                for callback, period in callbacks:
-                    if (epoch+1) % period == 0:
-                        callback()
+            # Plot the progress
+            print ("\n%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
+            for callback, period in callbacks:
+                if (epoch+1) % period == 0:
+                    callback()
     
     def save(self, file_prefix='dcgan'):
         self.generator.save_weights(f"{file_prefix}_g.h5")
