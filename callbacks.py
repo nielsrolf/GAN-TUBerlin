@@ -1,9 +1,8 @@
 import numpy as np
 from matplotlib import pyplot as plt
+from gan import GradientInverser
 
 
-
-        
 class PMetrics():
     def __init__(self, gan, x_test):
         self.gan = gan
@@ -13,7 +12,7 @@ class PMetrics():
         self.p_real, self.real_std = [], []
         
     def track(self, *ignored_args, **ignored_kwargs):
-        y_fake = self.gan.D.predict(self.gan.G(self.z_test))
+        y_fake = self.gan.D.predict(self.gan.G.predict(self.z_test))
         y_real = self.gan.D.predict(self.x_test)
         self.p_fake += [y_fake.mean()]
         self.p_real += [y_real.mean()]
@@ -52,10 +51,29 @@ class EvolvingImageCallback():
         self.z = gan.prior(10) # for plotting how the projection evolves
         
     def plot(self):
-        fakes = self.gan.G(self.z)
+        fakes = self.gan.G.predict(self.z)
         show(fakes)
 
 
+class Evolving2DCallback():
+    def __init__(self, gan):
+        self.gan = gan
+        self.z = gan.prior(100) # for plotting how the projection evolves
+        self.z_at_epoch = [gan.G.predict(self.z)]
+    
+    def track(self):
+        self.z_at_epoch += [self.gan.G.predict(self.z)]
+        
+    def plot(self):
+        t = np.stack(self.z_at_epoch, axis=0)
+        epochs = len(self.z_at_epoch)
+        plt.clf()
+        plt.plot(x[:,0], x[:,1], 'o')
+        for p in range(t.shape[1]):
+            plt.plot(t[:,p,0], t[:,p,1], alpha=0.5, color='orange')
+        plt.plot(t[-1,:,0], t[-1,:,1], 'o', color='red')
+        plt.title(f"Epoch {epochs}")
+        plt.show()
 class InterpolationCallback(EvolvingImageCallback):
     def __init__(self, gan):
         self.gan = gan
@@ -70,10 +88,10 @@ class Evolving2DCallback():
     def __init__(self, gan):
         self.gan = gan
         self.z = gan.prior(100) # for plotting how the projection evolves
-        self.z_at_epoch = [gan.G(self.z)]
+        self.z_at_epoch = [gan.G.predict(self.z)]
     
     def track(self):
-        self.z_at_epoch += [self.gan.G(self.z)]
+        self.z_at_epoch += [self.gan.G.predict(self.z)]
         
     def plot(self):
         t = np.stack(self.z_at_epoch, axis=0)
@@ -85,3 +103,24 @@ class Evolving2DCallback():
         plt.plot(t[-1,:,0], t[-1,:,1], 'o', color='red')
         plt.title(f"Epoch {epochs}")
         plt.show()
+
+
+class InverseDistributionCallback():
+    def __init__(self, gan, x, title=""):
+        self.gan = gan
+        self.x = x
+        self.inverse = GradientInverser(gan)
+        self.title=title
+        
+    def plot(self):
+        z = self.gan.prior(1000)
+        x_inv = self.inverse(self.x)
+        plt.plot(z[:,0], z[:,1], "o", label='Prior')
+        plt.plot(x_inv[:,0], x_inv[:,1], "o", label='Reconstruction')
+        plt.title(self.title)
+        plt.show()
+        
+        print('Reconstruction', self.title)
+        show(self.gan.G.predict(x_inv[:10]))
+        print('Original', self.title)
+        show(self.x[:10])

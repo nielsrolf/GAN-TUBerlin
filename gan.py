@@ -6,12 +6,17 @@ from tensorflow.keras.layers import LeakyReLU
 from tensorflow.keras.layers import UpSampling2D, Conv2D
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.optimizers import Adam
-
+from tensorflow.keras import backend as K
+from tensorflow.keras import losses
+from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
-
 import sys
-
 import numpy as np
+import tensorflow as tf
+from tensorflow.python.framework.ops import disable_eager_execution
+
+
+disable_eager_execution()
 
 
 
@@ -27,16 +32,19 @@ def batches(x, batch_size):
         
         
 class DCGAN():
-    def __init__(self, prior, img_shape=(28, 28, 1)):
+    def __init__(self, prior, img_shape=(28, 28, 1), load_from=None):
         self.img_shape = img_shape
         self.channels = img_shape[-1]
         self.latent_dim = 100
         self.prior = prior
+        
+          
 
         optimizer = Adam(0.0002, 0.5)
 
         # Build and compile the discriminator
         self.discriminator = self.build_discriminator()
+        
         self.discriminator.compile(loss='binary_crossentropy',
             optimizer=optimizer,
             metrics=['accuracy'])
@@ -61,6 +69,11 @@ class DCGAN():
         
         self.G = self.generator
         self.D = self.discriminator
+        
+        
+        if load_from:
+          self.generator.load_weights(load_from+"_g.h5")
+          self.discriminator.load_weights(load_from+"_d.h5")
 
     def build_generator(self):
 
@@ -78,8 +91,6 @@ class DCGAN():
         model.add(Activation("relu"))
         model.add(Conv2D(self.channels, kernel_size=3, padding="same"))
         model.add(Activation("tanh"))
-
-        model.summary()
 
         noise = Input(shape=(self.prior.d,))
         img = model(noise)
@@ -109,8 +120,6 @@ class DCGAN():
         model.add(Flatten())
         model.add(Dense(1, activation='sigmoid'))
 
-        model.summary()
-
         img = Input(shape=self.img_shape)
         validity = model(img)
 
@@ -134,7 +143,6 @@ class DCGAN():
             idx = np.random.randint(0, X_train.shape[0], batch_size)
             imgs = X_train[idx]
             for batch_id, imgs in enumerate(batches(X_train, batch_size)):
-              print(batch_id, '.', end='')
 
               # Sample noise and generate a batch of new images
               noise = self.prior(batch_size)
@@ -164,35 +172,30 @@ class DCGAN():
                 callback()
     
     def save(self, file_prefix='dcgan'):
-        self.generator.save(f"{file_prefix}_g.h5")
-        self.discriminator.save(f"{file_prefix}_d.h5")
-
-    def save_imgs(self, epoch):
-        r, c = 5, 5
-        noise = np.random.normal(0, 1, (r * c, self.latent_dim))
-        gen_imgs = self.generator.predict(noise)
-
-        # Rescale images 0 - 1
-        gen_imgs = 0.5 * gen_imgs + 0.5
-
-        fig, axs = plt.subplots(r, c)
-        cnt = 0
-        for i in range(r):
-            for j in range(c):
-                axs[i,j].imshow(gen_imgs[cnt, :,:,0], cmap='gray')
-                axs[i,j].axis('off')
-                cnt += 1
-        fig.savefig("images/mnist_%d.png" % epoch)
-        plt.close()
-
+        self.generator.save_weights(f"{file_prefix}_g.h5")
+        self.discriminator.save_weights(f"{file_prefix}_d.h5")
 
 
 class Uniform():
     def __init__(self, d=100):
         self.d = d
+        self.low = -1
+        self.high = 1
     
     def __call__(self, n):
         return np.random.uniform(low=-1, high=1, size=(n, self.d))
+
+
+class Unconnected(Uniform):
+    def __init__(self, d=100):
+        self.d = d
+        self.low = -1.1
+        self.high = 1.1
+        
+    def __call__(self, n):
+        z = np.random.uniform(low=-1, high=1, size=(n, self.d))
+        z += np.sign(z)*0.1
+        return z
 
 
 class GradientInverser():
