@@ -160,6 +160,7 @@ class DCGAN():
                 # ---------------------
                 #  Train Generator
                 # ---------------------
+                g_loss = -1
                 for _ in range(g_steps):
                     # Train the generator (wants discriminator to mistake images as real)
                     y_val = self.discriminator.predict(imgs[:10])
@@ -176,6 +177,42 @@ class DCGAN():
         self.generator.save_weights(f"{file_prefix}_g.h5")
         self.discriminator.save_weights(f"{file_prefix}_d.h5")
 
+
+class MiniGan(DCGAN):
+    def __init__(self, prior, img_shape=[2], load_from=None, neurons=512):
+        self.neurons = neurons
+        super().__init__(prior, img_shape, load_from)
+        
+    def build_generator(self):
+
+        model = Sequential()
+
+        model.add(Dense(self.neurons, activation="relu", input_dim=self.prior.d))
+        model.add(Dense(self.neurons, activation="relu", input_dim=self.prior.d))
+        model.add(Dense(self.neurons, activation="relu", input_dim=self.prior.d))
+        model.add(Dense(2, activation="tanh"))
+
+        noise = Input(shape=(self.prior.d,))
+        img = model(noise)
+
+        return Model(noise, img)
+
+    def build_discriminator(self):
+
+        model = Sequential()
+
+        model.add(Dense(self.neurons, activation="tanh", input_dim=self.prior.d))
+        model.add(Dense(self.neurons, activation="tanh", input_dim=self.prior.d))
+        model.add(Dense(self.neurons, activation="tanh", input_dim=self.prior.d))
+        
+        model.add(Dense(1, activation='sigmoid'))
+
+        img = Input(shape=self.img_shape)
+        validity = model(img)
+
+        return Model(img, validity)
+
+        
 
 class Uniform():
     def __init__(self, d=100):

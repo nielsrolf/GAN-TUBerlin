@@ -78,11 +78,25 @@ class InterpolationCallback(EvolvingImageCallback):
         self.z = a*x + b
 
 
-class InterpolationCallback2D(InterpolationCallback):
-    def show(self, x):
-        plt.plot(x[:,0], x[:,1])
-        plt.title("Projection of interpolation between two points")
+class InterpolationCallback2D():
+    def __init__(self, gan):
+        self.gan = gan
+        #r = np.arange(gan.prior.low, gan.prior.high+0.01, 0.1)
+        r = np.arange(-1, 1+0.01, 0.05)
+        grid = np.zeros([len(r), len(r), 2])
+        grid[:,:,0] = r[None,...]
+        grid[:,:,1] = r[...,None]
+        self.grid = grid
+        
+    def plot(self):
+        x_grid = self.gan.generator.predict(self.grid.reshape([-1, 2])).reshape(self.grid.shape)
+        for i in range(len(x_grid)):
+            plt.plot(x_grid[i,:,0], x_grid[i,:,1], color='blue', linewidth=1, alpha=0.5)
+            plt.plot(x_grid[:,i,0], x_grid[:,i,1], color='blue', linewidth=1, alpha=0.5)
+            plt.plot(x_grid[i,:,0], x_grid[i,:,1], '.', color='blue', linewidth=1)
+            plt.plot(x_grid[:,i,0], x_grid[:,i,1], '.', color='blue', linewidth=1)
         plt.show()
+
 
 class EvolvingCallback2D():
     def __init__(self, gan, x):
@@ -107,11 +121,12 @@ class EvolvingCallback2D():
 
 
 class InverseDistributionCallback():
-    def __init__(self, gan, x, title=""):
+    def __init__(self, gan, x, title="", show_samples=show):
         self.gan = gan
         self.x = x
         self.inverse = GradientInverser(gan)
         self.title=title
+        self.show_samples = show_samples
         
     def plot(self):
         z = self.gan.prior(1000)
@@ -120,11 +135,12 @@ class InverseDistributionCallback():
         plt.plot(x_inv[:,0], x_inv[:,1], "o", label='Reconstruction')
         plt.title(self.title)
         plt.show()
-        
-        print('Reconstruction', self.title)
-        show(self.gan.G.predict(x_inv[:10]))
-        print('Original', self.title)
-        show(self.x[:10])
+
+        if self.show_samples:
+            print('Reconstruction', self.title)
+            self.show_samples(self.gan.G.predict(x_inv[:10]))
+            print('Original', self.title)
+            self.show_samples(self.x[:10])
 
 
 class ModeCollapseObserver():

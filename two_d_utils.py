@@ -33,9 +33,6 @@ def generate_2d(n_per_mode, radius=0.2):
     return np.concatenate([get_mode(c, n_per_mode, radius) for c in centers], axis=0)
 
 
-x = np.load('data/2d.npy')
-
-
 uniform = Uniform()
 
 def show_learned_distribution(prior, G):
@@ -142,9 +139,9 @@ def d_landscape(D, x, title=None):
 
 
 class DLandscapeCallback():
-    def __init__(self, gan, data=x):
+    def __init__(self, gan, data):
         self.gan = gan
-        self.data = x
+        self.data = data
     
     def plot(self, *args, **kwargs):
         d_landscape(self.gan.D, np.concatenate([self.data,self.gan.G.predict(self.gan.prior(400))], axis=0))
