@@ -121,10 +121,12 @@ class EvolvingCallback2D():
 
 
 class InverseDistributionCallback():
-    def __init__(self, gan, x, title="", show_samples=show):
+    def __init__(self, gan, x, title="", show_samples=show, inverse=None):
+        if inverse is None:
+            inverse = GradientInverser(gan).invert
         self.gan = gan
         self.x = x
-        self.inverse = GradientInverser(gan)
+        self.inverse = inverse
         self.title=title
         self.show_samples = show_samples
         
@@ -156,7 +158,7 @@ class ModeCollapseObserver():
         plt.show()
         
         
-def train_mnist_predictor():
+def train_mnist_predictor(X_train, X_test):
     model = Sequential()
     model.add(Conv2D(32, kernel_size=(3, 3),
                      activation='relu',
@@ -178,8 +180,51 @@ def train_mnist_predictor():
               epochs=12,
               verbose=1,
               validation_data=(X_test, Y_test))
-    model.save(f"{PROJECT_PATH}/mnist_predictor.h5")
+    try:
+        model.save(f"mnist_predictor.h5")
+    except Exception as e:
+        print("model not saved:", e)
+    return model
 
     
-def get_mnist_predictor():
-    return load_model(f"{PROJECT_PATH}/mnist_predictor.h5")
+def get_mnist_predictor(PROJECT_PATH):
+    return load_model("mnist_predictor.h5")
+
+
+class OverfittingCallback():
+    def __init__(self, gan, x_train, x_test, plot_reconstructions=True, Inverser=GradientInverser):
+        # assumes that track is called after every epoch
+        self.gan = gan
+        self.x_train = x_train
+        self.x_test = x_test
+        self.invert = GradientInverser(gan)
+        self.train_reconstruction_mse = []
+        self.test_reconstruction_mse = []
+        self.plot_reconstructions = plot_reconstructions
+
+    def track(self):
+        train_inv = self.invert(self.x_train)
+        train_reconstruction = self.gan.generator.predict(train_inv)
+        self.train_reconstruction_mse += [np.mean(np.square(train_reconstruction - self.x_train))]
+        test_inv = self.invert(self.x_test)
+        test_reconstruction = self.gan.generator.predict(test_inv)
+        self.test_reconstruction_mse += [np.mean(np.square(test_reconstruction - self.x_test))]
+        if self.plot_reconstructions:
+            print('Train reconstruction')
+            show(train_reconstruction[:10])
+            print('Original Train')
+            show(self.x_train[:10])
+
+            print('Test reconstruction')
+            show(test_reconstruction[:10])
+            print('Original Test')
+            show(self.x_test[:10])
+    
+    def plot(self):
+        epochs = list(range(len(self.train_reconstruction_mse)))
+        plt.plot(epochs, self.train_reconstruction_mse, label='Train')
+        plt.plot(epochs, self.test_reconstruction_mse, label='Test')
+        plt.xlabel('Epoch')
+        plt.ylabel('Reconstruction Loss')
+        plt.legend()
+        plt.show()
