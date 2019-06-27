@@ -19,6 +19,16 @@ from tensorflow.python.framework.ops import disable_eager_execution
 disable_eager_execution()
 
 
+def show(images):
+    images = np.reshape(images, [-1, 28, 28])
+    n = images.shape[0]
+    fig, axes = plt.subplots(nrows=1, ncols=n, figsize=(n, 2),
+                                    sharex=True, sharey=True)
+    for i, img, ax in zip(range(n), images, axes):
+        ax.imshow((img+1)/2, cmap='Greys')
+        ax.axis('off')
+    plt.show()
+
 
 def batches(x, batch_size):
     """
@@ -67,10 +77,11 @@ class DCGAN():
         self.D = self.discriminator
         self.optimizer = optimizer
         
-        
         if load_from:
             self.generator.load_weights(load_from+"_g.h5")
             self.discriminator.load_weights(load_from+"_d.h5")
+
+        self._invert = GradientInverser(self)
 
     def build_generator(self):
 
@@ -174,6 +185,19 @@ class DCGAN():
     def save(self, file_prefix='dcgan'):
         self.generator.save_weights(f"{file_prefix}_g.h5")
         self.discriminator.save_weights(f"{file_prefix}_d.h5")
+    
+    def invert(self, x):
+        return self._invert(x)
+
+    def fill_image_patches(self, x, mask):
+        pass
+
+    def interpolate(self, x0, x1):
+        b = x0[None,...]
+        a = x1[None,...] - b
+        x = np.arange(0, 1.05, 0.1)[...,None]
+        z = a*x + b
+        show(self.generate(z))
 
 
 class MiniGan(DCGAN):
@@ -212,13 +236,13 @@ class MiniGan(DCGAN):
    
 
 class Uniform():
-    def __init__(self, d=100):
+    def __init__(self, d=100, low=-1, high=1):
         self.d = d
-        self.low = -1
-        self.high = 1
+        self.low = low
+        self.high = high
     
     def __call__(self, n):
-        return np.random.uniform(low=-1, high=1, size=(n, self.d))
+        return np.random.uniform(low=self.low, high=self.high, size=(n, self.d))
 
 
 class Unconnected(Uniform):
@@ -361,3 +385,8 @@ class AutoencodingGAN(DCGAN):
     
     def discriminate(self, x):
         return self.discriminator.predict(x)
+
+    def save(self, file_prefix='ae_gan'):
+        self.generator.save_weights(f"{file_prefix}_g.h5")
+        self.discriminator.save_weights(f"{file_prefix}_d.h5")
+        self.encoder.save_weights(f"{file_prefix}_enc.h5")

@@ -1,0 +1,20 @@
+Report: Properties of GANs as feature extractor
+
+1. GAN introduction
+
+2. How can we invert a GAN?
+- Gradient descent
+- Autoencoder hybrid
+- Comparison: gan vs autoencoder, why can the GAN encode samples much better than the autoencoder can generate?
+
+3. Making use of the encoding
+- interpolating
+- filling image patches 
+- negative result: interpretability
+    - idea: starGAN to change only labels
+*- linear classifier on z vs x space, connection to svm
+
+4. Controlling properties of the encoding
+- Use T-Approach to replicate image modes in latent modes 
+*- Use an additional random discrete vector to replicate modes (does it learn to use them as lbel vectors?)
+

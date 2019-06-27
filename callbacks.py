@@ -188,7 +188,7 @@ def train_mnist_predictor(X_train, X_test):
 
     
 def get_mnist_predictor(PROJECT_PATH):
-    return load_model("mnist_predictor.h5")
+    return load_model("{PROJECT_PATH}/mnist_predictor.h5")
 
 
 class OverfittingCallback():
